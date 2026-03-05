@@ -13,6 +13,8 @@ definitions:
     vars:
       XCODE_PROJECT: "NLZM1SCH.xcodeproj"
       XCODE_SCHEME: "NLZM1SCH"
+      BUNDLE_ID: "com.flo.d4fg72hkp0k"
+      APP_STORE_APP_ID: "6759965158"
 
   ios_initialize_keychain: &ios_initialize_keychain
     name: Set up keychain
@@ -25,24 +27,6 @@ definitions:
       set -ex
       cd "$FCI_BUILD_DIR"
       xcodebuild -list -project "$XCODE_PROJECT"
-
-  detect_bundle_id: &detect_bundle_id
-    name: Detect bundle id
-    script: |
-      set -ex
-      cd "$FCI_BUILD_DIR"
-
-      SETTINGS=$(xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -showBuildSettings)
-      echo "$SETTINGS" | grep -E "PRODUCT_BUNDLE_IDENTIFIER" | head -n 1 || true
-
-      BUNDLE_ID=$(echo "$SETTINGS" | awk -F " = " '/PRODUCT_BUNDLE_IDENTIFIER/ {print $2; exit}')
-      if [ -z "$BUNDLE_ID" ]; then
-        echo "ERROR: Could not detect PRODUCT_BUNDLE_IDENTIFIER. Check scheme name and ensure it is Shared."
-        exit 1
-      fi
-
-      echo "Detected BUNDLE_ID=$BUNDLE_ID"
-      echo "BUNDLE_ID=$BUNDLE_ID" >> $CM_ENV
 
   fetch_signing_files: &fetch_signing_files
     name: Fetch signing files (App Store)
@@ -93,7 +77,6 @@ workflows:
     scripts:
       - *ios_initialize_keychain
       - *debug_list_schemes
-      - *detect_bundle_id
       - *fetch_signing_files
       - *add_certs_to_keychain
       - *use_profiles
@@ -127,7 +110,6 @@ workflows:
     scripts:
       - *ios_initialize_keychain
       - *debug_list_schemes
-      - *detect_bundle_id
       - *fetch_signing_files
       - *add_certs_to_keychain
       - *use_profiles
