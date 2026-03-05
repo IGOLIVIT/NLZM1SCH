@@ -20,14 +20,14 @@ definitions:
       keychain initialize
 
   debug_list_schemes: &debug_list_schemes
-    name: Debug: list schemes
+    name: Debug - list schemes
     script: |
       set -ex
       cd "$FCI_BUILD_DIR"
       xcodebuild -list -project "$XCODE_PROJECT"
 
   detect_bundle_id: &detect_bundle_id
-    name: Detect Bundle ID from project
+    name: Detect bundle id
     script: |
       set -ex
       cd "$FCI_BUILD_DIR"
@@ -63,7 +63,7 @@ definitions:
       xcode-project use-profiles -v
 
   set_build_number: &set_build_number
-    name: Set build number from Codemagic BUILD_NUMBER
+    name: Set build number
     script: |
       set -ex
       cd "$FCI_BUILD_DIR"
@@ -83,7 +83,6 @@ workflows:
     environment:
       <<: *env_versions
       <<: *app_environment
-
     triggering:
       events:
         - tag
@@ -91,7 +90,6 @@ workflows:
         - pattern: "main"
           include: true
           source: true
-
     scripts:
       - *ios_initialize_keychain
       - *debug_list_schemes
@@ -101,13 +99,11 @@ workflows:
       - *use_profiles
       - *set_build_number
       - *build_ipa
-
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
-
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
@@ -121,7 +117,6 @@ workflows:
     environment:
       <<: *env_versions
       <<: *app_environment
-
     triggering:
       events:
         - push
@@ -129,7 +124,6 @@ workflows:
         - pattern: "develop"
           include: true
           source: true
-
     scripts:
       - *ios_initialize_keychain
       - *debug_list_schemes
@@ -139,13 +133,11 @@ workflows:
       - *use_profiles
       - *set_build_number
       - *build_ipa
-
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
-
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
