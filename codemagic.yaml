@@ -1,0 +1,154 @@
+definitions:
+  instance_mac_m2: &instance_mac_m2
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+  env_versions: &env_versions
+    xcode: latest
+    cocoapods: default
+
+  app_environment: &app_environment
+    groups:
+      - appstore_credentials
+    vars:
+      XCODE_PROJECT: "NLZM1SCH.xcodeproj"
+      XCODE_SCHEME: "NLZM1SCH"
+
+  ios_initialize_keychain: &ios_initialize_keychain
+    name: Set up keychain
+    script: |
+      keychain initialize
+
+  debug_list_schemes: &debug_list_schemes
+    name: Debug: list schemes
+    script: |
+      set -ex
+      cd "$FCI_BUILD_DIR"
+      xcodebuild -list -project "$XCODE_PROJECT"
+
+  detect_bundle_id: &detect_bundle_id
+    name: Detect Bundle ID from project
+    script: |
+      set -ex
+      cd "$FCI_BUILD_DIR"
+
+      SETTINGS=$(xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -showBuildSettings)
+      echo "$SETTINGS" | grep -E "PRODUCT_BUNDLE_IDENTIFIER" | head -n 1 || true
+
+      BUNDLE_ID=$(echo "$SETTINGS" | awk -F " = " '/PRODUCT_BUNDLE_IDENTIFIER/ {print $2; exit}')
+      if [ -z "$BUNDLE_ID" ]; then
+        echo "ERROR: Could not detect PRODUCT_BUNDLE_IDENTIFIER. Check scheme name and ensure it is Shared."
+        exit 1
+      fi
+
+      echo "Detected BUNDLE_ID=$BUNDLE_ID"
+      echo "BUNDLE_ID=$BUNDLE_ID" >> $CM_ENV
+
+  fetch_signing_files: &fetch_signing_files
+    name: Fetch signing files (App Store)
+    script: |
+      set -ex
+      app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+
+  add_certs_to_keychain: &add_certs_to_keychain
+    name: Add certificates to keychain
+    script: |
+      keychain add-certificates
+
+  use_profiles: &use_profiles
+    name: Apply provisioning profiles
+    script: |
+      set -ex
+      cd "$FCI_BUILD_DIR"
+      xcode-project use-profiles -v
+
+  set_build_number: &set_build_number
+    name: Set build number from Codemagic BUILD_NUMBER
+    script: |
+      set -ex
+      cd "$FCI_BUILD_DIR"
+      agvtool new-version -all "$BUILD_NUMBER"
+
+  build_ipa: &build_ipa
+    name: Build ipa
+    script: |
+      set -ex
+      cd "$FCI_BUILD_DIR"
+      xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+
+workflows:
+  ios-release:
+    name: iOS release
+    <<: *instance_mac_m2
+    environment:
+      <<: *env_versions
+      <<: *app_environment
+
+    triggering:
+      events:
+        - tag
+      branch_patterns:
+        - pattern: "main"
+          include: true
+          source: true
+
+    scripts:
+      - *ios_initialize_keychain
+      - *debug_list_schemes
+      - *detect_bundle_id
+      - *fetch_signing_files
+      - *add_certs_to_keychain
+      - *use_profiles
+      - *set_build_number
+      - *build_ipa
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+
+  ios-staging:
+    name: iOS staging
+    <<: *instance_mac_m2
+    environment:
+      <<: *env_versions
+      <<: *app_environment
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "develop"
+          include: true
+          source: true
+
+    scripts:
+      - *ios_initialize_keychain
+      - *debug_list_schemes
+      - *detect_bundle_id
+      - *fetch_signing_files
+      - *add_certs_to_keychain
+      - *use_profiles
+      - *set_build_number
+      - *build_ipa
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
